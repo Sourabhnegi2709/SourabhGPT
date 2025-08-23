@@ -90,7 +90,7 @@ const ChatWindow = () => {
     setCurrThread(threadId);
 
     try {
-      const response = await fetch("http://localhost:5000/api/chat", {
+      const response = await fetch("https://sourabhgpt.onrender.com/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -41,7 +41,7 @@ function App() {
         <ThemeProvider>
           <div className="app-container flex h-screen bg-gray-100 dark:bg-gray-900 relative">
             <Sidebar />
-            <ChatWindow /> {/* 👈 ChatWindow itself will decide what to render */}
+            <ChatWindow />
           </div>
         </ThemeProvider>
       </GPTContext.Provider>

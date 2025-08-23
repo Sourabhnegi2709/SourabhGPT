@@ -14,7 +14,7 @@ const Auth = ({ isOpen, onClose }) => {
         e.preventDefault();
         const endpoint = isSignup ? "signup" : "login";
 
-        const res = await fetch(`http://localhost:5000/api/auth/${endpoint}`, {
+        const res = await fetch(`https://sourabhgpt.onrender.com/api/auth/${endpoint}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(form),
