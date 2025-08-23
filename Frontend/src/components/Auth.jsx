@@ -7,27 +7,39 @@ const Auth = ({ isOpen, onClose }) => {
     const { login } = useContext(AuthContext);
     const [isSignup, setIsSignup] = useState(false);
     const [form, setForm] = useState({ username: "", email: "", password: "" });
+    const [error, setError] = useState("");       // ✅ error state
+    const [loading, setLoading] = useState(false); // ✅ loading state
 
     if (!isOpen) return null;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const endpoint = isSignup ? "signup" : "login";
+        setError("");     // reset error before new attempt
+        setLoading(true); // start loading
 
-        const res = await fetch(`https://sourabhgpt.onrender.com/api/auth/${endpoint}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(form),
-        });
+        try {
+            const endpoint = isSignup ? "signup" : "login";
+            const res = await fetch(`https://sourabhgpt.onrender.com/api/auth/${endpoint}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(form),
+                credentials: "include", // in case cookies/refresh tokens are used
+            });
 
-        const data = await res.json();
-        if (!res.ok) {
-            alert(data.error || "Auth failed");
-            return;
+            const data = await res.json();
+
+            if (!res.ok) {
+                setError(data.message || "Authentication failed");
+                return;
+            }
+
+            login(data.user, data.token);
+            onClose(); // ✅ close modal after success
+        } catch (err) {
+            setError("Something went wrong. Please try again.");
+        } finally {
+            setLoading(false); // stop loading
         }
-
-        login(data.user, data.token);
-        onClose(); // ✅ close modal after success
     };
 
     return (
@@ -58,6 +70,17 @@ const Auth = ({ isOpen, onClose }) => {
                         <h2 className="text-xl font-bold mb-4 text-center">
                             {isSignup ? "Create Account" : "Login"}
                         </h2>
+
+                        {/* ✅ Error Message */}
+                        {error && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mb-3 text-sm text-red-600 bg-red-100 dark:bg-red-900/40 dark:text-red-400 p-2 rounded"
+                            >
+                                {error}
+                            </motion.div>
+                        )}
 
                         <form onSubmit={handleSubmit}>
                             {isSignup && (
@@ -97,15 +120,27 @@ const Auth = ({ isOpen, onClose }) => {
 
                             <button
                                 type="submit"
-                                className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
+                                disabled={loading}
+                                className={`w-full py-2 rounded-lg transition text-white ${
+                                    loading
+                                        ? "bg-gray-400 cursor-not-allowed"
+                                        : "bg-blue-600 hover:bg-blue-700"
+                                }`}
                             >
-                                {isSignup ? "Sign Up" : "Login"}
+                                {loading
+                                    ? "Processing..."
+                                    : isSignup
+                                    ? "Sign Up"
+                                    : "Login"}
                             </button>
                         </form>
 
                         <p
                             className="text-sm text-center mt-4 cursor-pointer text-blue-500"
-                            onClick={() => setIsSignup(!isSignup)}
+                            onClick={() => {
+                                setIsSignup(!isSignup);
+                                setError(""); // reset error when switching modes
+                            }}
                         >
                             {isSignup
                                 ? "Already have an account? Login"
