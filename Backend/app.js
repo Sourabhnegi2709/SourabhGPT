@@ -24,7 +24,7 @@ const connectDb = async () => {
 
 // ✅ Middleware
 app.use(cors({
-    origin: "https://sourabhgpt.netlify.app/",
+    origin: "https://sourabhgpt.netlify.app",
     credentials: true
 }));
 app.use(express.json());
