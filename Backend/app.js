@@ -23,10 +23,21 @@ const connectDb = async () => {
 };
 
 // ✅ Middleware
+const allowedOrigins = ["https://sourabhgpt.netlify.app"];
 app.use(cors({
-    origin: "https://sourabhgpt.netlify.app",
-    credentials: true
+    origin: function(origin, callback) {
+        // allow requests with no origin (e.g., Postman)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = "The CORS policy for this site does not allow access from the specified Origin.";
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
+    credentials: true, // allow cookies and Authorization headers
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 }));
+
 app.use(express.json());
 
 // ✅ Routes
