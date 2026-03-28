@@ -7,7 +7,7 @@ const geminiApiResponse = async (message) => {
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
-            model: "models/gemini-2.5-flash",
+            model: "models/gemini-2.0-flash",
             contents: [
                 {
                     role: "user",
@@ -19,7 +19,7 @@ const geminiApiResponse = async (message) => {
 
     try {
         const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
             option
         );
 
