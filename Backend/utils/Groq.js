@@ -38,19 +38,24 @@
 
 // export default geminiApiResponse;
 
-
 import "dotenv/config";
 import Groq from "groq-sdk";
 
-const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY,
-});
-
 const groqApiResponse = async (message) => {
-
     try {
+
+        // ✅ Check env variable FIRST
+        if (!process.env.GROQ_API_KEY) {
+            throw new Error("GROQ_API_KEY is not set");
+        }
+
+        // ✅ Create client INSIDE function (important)
+        const groq = new Groq({
+            apiKey: process.env.GROQ_API_KEY,
+        });
+
         const response = await groq.chat.completions.create({
-            model: "llama3-8b-8192", // free model
+            model: "llama3-8b-8192",
             messages: [
                 {
                     role: "user",
@@ -64,12 +69,13 @@ const groqApiResponse = async (message) => {
             JSON.stringify(response, null, 2)
         );
 
-        const reply = response.choices?.[0]?.message?.content;
+        const reply = response?.choices?.[0]?.message?.content;
 
         return reply || "No response from Groq.";
 
     } catch (error) {
-        console.error("Groq API error:", error);
+        console.error("Groq API error:", error.message);
+
         return "Error occurred while fetching Groq response.";
     }
 };
