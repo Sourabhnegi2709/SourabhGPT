@@ -44,6 +44,8 @@ app.use(express.json());
 app.use("/api", chatRoutes);
 app.use("/api/auth", userRoute); // better: namespace auth
 
+
+
 // ✅ Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, async () => {
