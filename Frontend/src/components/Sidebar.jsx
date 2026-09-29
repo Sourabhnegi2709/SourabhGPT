@@ -1,16 +1,16 @@
-import { useState, useEffect, useRef, useContext } from "react";
-import { Plus, Trash2, Settings, User, SquarePen, EllipsisVertical, Edit, Archive, LogIn } from "lucide-react";
-import blackLogo from "../assets/blacklogo.png";
-import { GPTContext } from "../context/GPT.Context";
+import { AnimatePresence, motion } from "framer-motion";
+import { Archive, Edit, EllipsisVertical, Plus, Settings, SquarePen, Trash2, User } from "lucide-react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { v1 as uuid } from "uuid";
-import { motion, AnimatePresence } from "framer-motion";
+import blackLogo from "../assets/blacklogo.png";
+import { AuthContext } from "../context/AuthContext";
+import { GPTContext } from "../context/GPT.Context";
+import Auth from "./Auth";
 import SettingModal from "./SettingModal";
 import UserModal from "./UserModal";
-import { AuthContext } from "../context/AuthContext";
-import Auth from "./Auth";
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
-    const { token, user } = useContext(AuthContext);
+    const { token, user, logout } = useContext(AuthContext);
     const [showAuth, setShowAuth] = useState(false);
     const {
         allThreads, setAllThreads,
@@ -26,16 +26,87 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [userOpen, setUserOpen] = useState(false);
     const [openMenu, setOpenMenu] = useState(null);
+    const [threadFetchPending, setThreadFetchPending] = useState(false);
     const menuRef = useRef(null);
+    const baseApiUrl = import.meta.env.DEV ? "" : "https://sourabhgpt.onrender.com";
 
-    // 🗑️ Delete thread
-    const deleteThread = async (threadId) => {
+    const normalizeToken = (jwt) => {
+        if (typeof jwt !== "string") return null;
+        const trimmed = jwt.trim();
+        if (
+            trimmed === "" ||
+            trimmed === "undefined" ||
+            trimmed === "null" ||
+            trimmed.split(".").length !== 3
+        ) {
+            return null;
+        }
+        return trimmed;
+    };
+
+    const getAllThreads = async (retry = 0) => {
+        const normalized = normalizeToken(token);
+        if (!normalized) {
+            console.warn("Skipping getAllThreads because token is missing or invalid", token);
+            if (token) logout();
+            return;
+        }
+
+        setThreadFetchPending(true);
         try {
-            const response = await fetch(`https://sourabhgpt.onrender.com/api/thread/${threadId}`, {
+            const apiUrl = `${baseApiUrl}/api/thread`;
+            console.debug("Fetching threads", { apiUrl, token: normalized?.slice(0, 20), retry });
+            const response = await fetch(apiUrl, {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${normalized}`,
+                    "Content-Type": "application/json",
+                },
+            });
+
+            const body = await response.json().catch(() => null);
+            if (!response.ok) {
+                console.warn("getAllThreads failed", { status: response.status, body, retry });
+                if (response.status === 401 && retry === 0) {
+                    setTimeout(() => getAllThreads(1), 300);
+                    return;
+                }
+                if (response.status === 401) {
+                    logout();
+                    alert(body?.message || "Session expired. Please login again.");
+                    return;
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const filteredData = Array.isArray(body)
+                ? body.map((t) => ({
+                    threadId: t.threadId || t._id,
+                    title: t.title || "Untitled Chat",
+                }))
+                : [];
+            setAllThreads(filteredData);
+        } catch (err) {
+            console.error("Error fetching threads:", err);
+            setAllThreads([]);
+        } finally {
+            setThreadFetchPending(false);
+        }
+    };
+
+    const deleteThread = async (threadId) => {
+        const normalized = normalizeToken(token);
+        if (!normalized) {
+            console.warn("Skipping deleteThread because token is missing or invalid", token);
+            return;
+        }
+
+        try {
+            const apiUrl = `${baseApiUrl}/api/thread`;
+            const response = await fetch(`${apiUrl}/${threadId}`, {
                 method: "DELETE",
                 headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`,
+                    "Authorization": `Bearer ${normalized}`,
                 },
             });
 
@@ -54,26 +125,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         }
     };
 
-    // 📂 Fetch all threads
-    const getAllThreads = async () => {
-        try {
-            const response = await fetch("https://sourabhgpt.onrender.com/api/thread", {
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`,
-                },
-            });
-            if (!response.ok) throw new Error("Failed to fetch threads");
-
-            const res = await response.json();
-            const filteredData = res.map((t) => ({ threadId: t.threadId, title: t.title }));
-            setAllThreads(filteredData);
-        } catch (err) {
-            console.error("Error fetching threads:", err);
-        }
-    };
-
-
     useEffect(() => {
         if (isDarkMode) {
             document.documentElement.classList.add("dark");
@@ -85,17 +136,19 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     }, [isDarkMode]);
 
     useEffect(() => {
-        if (token) {
-            getAllThreads();
-        } else {
-            setAllThreads([]);
-            setCurrThread(null);
-            setMessages([]);
-            setReply(null);
-            setPrompts("");
+        if (token && user) {
+            const timer = setTimeout(() => {
+                getAllThreads();
+            }, 500);
+            return () => clearTimeout(timer);
         }
-    }, [token, user]);
 
+        setAllThreads([]);
+        setCurrThread(null);
+        setMessages([]);
+        setReply(null);
+        setPrompts("");
+    }, [token, user]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -107,7 +160,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-
     const handleNewChat = () => {
         setReply(null);
         setPrompts("");
@@ -118,22 +170,33 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
         getAllThreads();
     };
 
-
     const changeThread = async (newThreadId) => {
+        const normalized = normalizeToken(token);
+        if (!normalized) {
+            console.warn("Skipping changeThread because token is missing or invalid", token);
+            return;
+        }
+
         setCurrThread(newThreadId);
         try {
-            const response = await fetch(`https://sourabhgpt.onrender.com/api/thread/${newThreadId}`, {
+            const apiUrl = `${baseApiUrl}/api/thread/${newThreadId}`;
+            const response = await fetch(apiUrl, {
+                method: "GET",
                 headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`,
+                    "Authorization": `Bearer ${normalized}`,
                 },
             });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const res = await response.json();
             setMessages(res.message);
             setReply(res.reply);
             setPrompts(res.title);
             setNewChats(false);
-            if (window.innerWidth < 640) setSidebarOpen(false); // auto-close on mobile
+            if (window.innerWidth < 640) setSidebarOpen(false);
         } catch (err) {
             console.error("Thread fetch error:", err);
         }

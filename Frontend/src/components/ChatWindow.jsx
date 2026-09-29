@@ -1,37 +1,37 @@
-import { useState, useRef, useEffect, useContext } from "react";
-import { v1 as uuid } from "uuid";
+import "katex/dist/katex.min.css";
+import { useContext, useEffect, useRef, useState } from "react";
 import ReactMarkDown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { AuthContext } from "../context/AuthContext";
-import UserModal from "./UserModal";
-import "katex/dist/katex.min.css";
-import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import remarkMath from "remark-math";
+import { v1 as uuid } from "uuid";
+import { AuthContext } from "../context/AuthContext";
 import Sidebar from "./Sidebar"; // ✅ Your existing sidebar
+import UserModal from "./UserModal";
 
 import {
-  Send,
-  User,
-  ArrowUpCircle,
-  ChevronDown,
-  Facebook,
-  Twitter,
-  Linkedin,
-  Link,
+    ArrowUpCircle,
+    ChevronDown,
+    Facebook,
+    Link,
+    Linkedin,
+    Send,
+    Twitter
 } from "lucide-react";
 
-import ThemeToggle from "./ThemeToggle";
-import ShareButton from "./ShareButton";
 import { HashLoader } from "react-spinners";
-import GPT from "./GPT";
 import { GPTContext } from "../context/GPT.Context";
 import Auth from "./Auth";
+import GPT from "./GPT";
+import ShareButton from "./ShareButton";
+import ThemeToggle from "./ThemeToggle";
 
 const ChatWindow = () => {
   const { token, user } = useContext(AuthContext);
   const [userOpen, setUserOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const baseApiUrl = import.meta.env.DEV ? "" : "https://sourabhgpt.onrender.com";
 
   const { messages, setMessages, currThread, setCurrThread, text, setText } = useContext(GPTContext);
 
@@ -90,7 +90,7 @@ const ChatWindow = () => {
     setCurrThread(threadId);
 
     try {
-      const response = await fetch("https://sourabhgpt.onrender.com/api/chat", {
+      const response = await fetch(`${baseApiUrl}/api/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -103,35 +103,43 @@ const ChatWindow = () => {
       });
 
       const data = await response.json().catch(() => ({}));
-      let safeReply =
+      if (!response.ok) {
+        console.error("Chat API failed", { status: response.status, data });
+        throw new Error(data.error || "Failed to send chat");
+      }
+      const safeReply =
         typeof data.reply === "string" ? data.reply.trim() : "[No response]";
+      const words = safeReply.split(/\s+/).filter(Boolean);
 
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      if (!words.length) {
+        setMessages((prev) => [...prev, { role: "assistant", content: "[No response]" }]);
+      } else {
+        setMessages((prev) => [...prev, { role: "assistant", content: words[0] }]);
 
-      let words = safeReply.split(/\s+/).filter(Boolean);
-      let i = 0;
-      const typingInterval = setInterval(() => {
-        if (i >= words.length) {
-          clearInterval(typingInterval);
-          return;
-        }
+        let i = 1;
+        const typingInterval = setInterval(() => {
+          if (i >= words.length) {
+            clearInterval(typingInterval);
+            return;
+          }
 
-        setMessages((prev) => {
-          const lastMsg =
-            prev[prev.length - 1] || { role: "assistant", content: "" };
-          const lastContent =
-            typeof lastMsg.content === "string" ? lastMsg.content : "";
-          const token = words[i] ?? "";
-          const updatedLastMsg = {
-            ...lastMsg,
-            content: lastContent.length ? lastContent + " " + token : token,
-          };
-          return [...prev.slice(0, -1), updatedLastMsg];
-        });
+          setMessages((prev) => {
+            const lastMsg =
+              prev[prev.length - 1] || { role: "assistant", content: "" };
+            const lastContent =
+              typeof lastMsg.content === "string" ? lastMsg.content : "";
+            const token = words[i] ?? "";
+            const updatedLastMsg = {
+              ...lastMsg,
+              content: lastContent.length ? lastContent + " " + token : token,
+            };
+            return [...prev.slice(0, -1), updatedLastMsg];
+          });
 
-        i++;
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }, 80);
+          i++;
+          chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 80);
+      }
 
       setInput("");
     } catch (err) {

@@ -1,7 +1,7 @@
 // components/Auth.jsx
-import { useState, useContext } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useContext, useState } from "react";
 import { AuthContext } from "../context/AuthContext";
-import { motion, AnimatePresence } from "framer-motion";
 
 const Auth = ({ isOpen, onClose }) => {
     const { login } = useContext(AuthContext);
@@ -12,6 +12,8 @@ const Auth = ({ isOpen, onClose }) => {
 
     if (!isOpen) return null;
 
+    const baseApiUrl = import.meta.env.DEV ? "" : "https://sourabhgpt.onrender.com";
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");     // reset error before new attempt
@@ -19,7 +21,8 @@ const Auth = ({ isOpen, onClose }) => {
 
         try {
             const endpoint = isSignup ? "signup" : "login";
-            const res = await fetch(`https://sourabhgpt.onrender.com/api/auth/${endpoint}`, {
+            const apiUrl = `${baseApiUrl}/api/auth/${endpoint}`;
+            const res = await fetch(apiUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(form),
@@ -29,10 +32,21 @@ const Auth = ({ isOpen, onClose }) => {
             const data = await res.json();
 
             if (!res.ok) {
+                console.error("Auth request failed", { status: res.status, data });
                 setError(data.message || "Authentication failed");
                 return;
             }
 
+            if (!data.token) {
+                console.error("Login completed without a token", data);
+                setError("Authentication failed: no token returned.");
+                return;
+            }
+
+            console.debug("Login success response", {
+                user: data.user,
+                tokenPreview: data.token?.slice(0, 20),
+            });
             login(data.user, data.token);
             onClose(); // ✅ close modal after success
         } catch (err) {

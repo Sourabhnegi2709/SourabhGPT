@@ -1,14 +1,16 @@
+import crypto from 'crypto';
 import express from "express";
+import { authMiddleware } from "../middleware/authMiddleware.js";
 import Thread from "../models/Thread.js";
-import groqApiResponse from "../utils/Groq.js";
-import { authMiddleware } from "../middleware/authMiddleware.js"; // ✅ protect routes
+import grokApiResponse from "../utils/gemini.js";
 
 const router = express.Router();
+
 
 // ✅ Get all threads for the logged-in user
 router.get("/thread", authMiddleware, async (req, res) => {
     try {
-        const threads = await Thread.find({ user: req.user.id }) // 👈 only user’s threads
+        const threads = await Thread.find({ user: req.user.id })
             .sort({ updatedAt: -1 });
         res.json(threads);
     } catch (err) {
@@ -49,49 +51,53 @@ router.delete("/thread/:threadId", authMiddleware, async (req, res) => {
 
 // ✅ Chat route (create or update thread for logged-in user)
 router.post("/chat", authMiddleware, async (req, res) => {
-    const { threadId, message } = req.body;
+    let { threadId, message } = req.body;
+
+    // ✅ Validation
+    if (!message || typeof message !== 'string' || message.trim().length > 20000 || message.trim().length < 1) {
+        return res.status(400).json({ error: "Message must be 1-20000 chars" });
+    }
+    message = message.trim();
+
+    // ✅ Auto-generate threadId if missing
+    if (!threadId || typeof threadId !== 'string') {
+        threadId = crypto.randomUUID();
+    }
 
     try {
         let thread = await Thread.findOne({ threadId, user: req.user.id });
 
         if (!thread) {
-            // create new thread owned by user
             thread = new Thread({
                 threadId,
-                title: message.slice(0, 30), // 👈 optional: shorter title
-                message: [
-                    {
-                        role: "user",
-                        content: message,
-                    },
-                ],
-                user: req.user.id, // ✅ attach owner
+                title: message.slice(0, 50) + '...',
+                message: [{
+                    role: "user",
+                    content: message,
+                }],
+                user: req.user.id,
             });
         } else {
-            // append new user message
             thread.message.push({
                 role: "user",
                 content: message,
             });
         }
 
-        // assistant response
-        // const assistantResponse = await geminiApiResponse(message);
-        const assistantResponse = await groqApiResponse(message);
+        const assistantResponse = await grokApiResponse(message);
 
-        // add assistant reply
         thread.message.push({
             role: "assistant",
             content: assistantResponse,
         });
 
-        thread.updatedAt = Date.now();
+        thread.updatedAt = new Date();
         await thread.save();
 
-        res.json({ reply: assistantResponse, threadId: thread.threadId });
+        res.json({ reply: assistantResponse, threadId });
     } catch (err) {
         console.error("Error in /chat:", err);
-        res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json({ error: "Chat failed. Try again." });
     }
 });
 

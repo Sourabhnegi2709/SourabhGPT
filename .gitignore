@@ -1,9 +1,20 @@
 # ==============================
-# ENV FILES (SECRETS)
+# ENV FILES / SECRETS
 # ==============================
 
-Backend/.env
-Frontend/.env
+# ignore all local env files
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.sample
+
+# extra secret / credential files
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.jks
 
 # ==============================
 # NODE MODULES

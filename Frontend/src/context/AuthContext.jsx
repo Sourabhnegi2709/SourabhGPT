@@ -1,5 +1,19 @@
 // src/context/AuthContext.js
-import React, { createContext, useState, useEffect } from "react";
+import { createContext, useEffect, useState } from "react";
+
+const normalizeJwt = (jwt) => {
+    if (typeof jwt !== "string") return null;
+    const trimmed = jwt.trim();
+    if (
+        trimmed === "" ||
+        trimmed === "undefined" ||
+        trimmed === "null" ||
+        trimmed.split(".").length !== 3
+    ) {
+        return null;
+    }
+    return trimmed;
+};
 
 export const AuthContext = createContext();
 
@@ -9,17 +23,37 @@ export const AuthProvider = ({ children }) => {
 
     // Load from localStorage on refresh
     useEffect(() => {
-        const storedToken = localStorage.getItem("token");
+        const storedToken = normalizeJwt(localStorage.getItem("token"));
         const storedUser = localStorage.getItem("user");
-        if (storedToken) setToken(storedToken);
-        if (storedUser) setUser(JSON.parse(storedUser));
+
+        if (storedToken) {
+            setToken(storedToken);
+        } else if (localStorage.getItem("token")) {
+            console.warn("Invalid stored token removed", localStorage.getItem("token"));
+            localStorage.removeItem("token");
+        }
+
+        if (storedUser) {
+            try {
+                setUser(JSON.parse(storedUser));
+            } catch (error) {
+                console.warn("Invalid stored user removed", storedUser);
+                localStorage.removeItem("user");
+            }
+        }
     }, []);
 
     // Login function
     const login = (userData, jwt) => {
+        const normalized = normalizeJwt(jwt);
+        if (!normalized) {
+            console.error("Auth login attempted with invalid JWT", jwt, userData);
+            return;
+        }
+
         setUser(userData);
-        setToken(jwt);
-        localStorage.setItem("token", jwt);
+        setToken(normalized);
+        localStorage.setItem("token", normalized);
         localStorage.setItem("user", JSON.stringify(userData));
     };
 

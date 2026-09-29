@@ -4,7 +4,8 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
+
+const getJwtSecret = () => process.env.JWT_SECRET || "supersecretkey";
 
 // ✅ Signup
 // ✅ Signup
@@ -24,7 +25,7 @@ router.post("/signup", async (req, res) => {
         await newUser.save();
 
         // create token (auto-login after signup)
-        const token = jwt.sign({ id: newUser._id }, JWT_SECRET, { expiresIn: "1h" });
+        const token = jwt.sign({ id: newUser._id }, getJwtSecret(), { expiresIn: "1h" });
 
         res.json({
             token,
@@ -50,12 +51,13 @@ router.post("/login", async (req, res) => {
         if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
         // create token
-        const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: "1h" });
+        const token = jwt.sign({ id: user._id }, getJwtSecret(), { expiresIn: "1h" });
 
         res.json({
             token,
             user: { id: user._id, username: user.username, email: user.email }
         });
+        
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
