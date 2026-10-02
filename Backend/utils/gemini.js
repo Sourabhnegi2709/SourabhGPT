@@ -1,44 +1,26 @@
 import "dotenv/config";
 import OpenAI from "openai";
 
-const getAiConfig = () => {
-    const apiKey = process.env.GROK_API_KEY || process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY;
+const getGroqConfig = () => {
+    const apiKey = process.env.GROQ_API_KEY;
 
     if (!apiKey) {
         return null;
     }
 
-    if (apiKey.startsWith("gsk_")) {
-        return {
-            apiKey,
-            baseURL: "https://api.groq.com/openai/v1",
-            model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
-            label: "Groq",
-        };
-    }
-
-    if (apiKey.startsWith("xai-")) {
-        return {
-            apiKey,
-            baseURL: "https://api.x.ai/v1",
-            model: process.env.GROK_MODEL || "grok-2-latest",
-            label: "Grok",
-        };
-    }
-
     return {
         apiKey,
-        baseURL: "https://api.x.ai/v1",
-        model: process.env.GROK_MODEL || "grok-2-latest",
-        label: "Grok",
+        baseURL: "https://api.groq.com/openai/v1",
+        model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
+        label: "Groq",
     };
 };
 
 const grokApiResponse = async (message) => {
     try {
-        const config = getAiConfig();
+        const config = getGroqConfig();
         if (!config) {
-            return "Please set GROK_API_KEY or GROQ_API_KEY in .env";
+            return "Please set GROQ_API_KEY in .env";
         }
 
         const client = new OpenAI({
@@ -46,9 +28,23 @@ const grokApiResponse = async (message) => {
             baseURL: config.baseURL,
         });
 
+        const formattedPrompt = `You are a helpful AI assistant.
+
+Respond in polished Markdown so the answer is easy to scan and read.
+Rules:
+- Use clear headings when the answer is longer or has multiple parts.
+- Use bullet lists or numbered lists for key points, steps, or comparisons.
+- Bold the most important facts, terms, or takeaways.
+- Keep paragraphs short and readable.
+- If the answer is technical, use code blocks only when they improve clarity.
+- Do not write plain dense paragraphs for long answers.
+
+User question:
+${message}`;
+
         const completion = await client.chat.completions.create({
             model: config.model,
-            messages: [{ role: "user", content: message }],
+            messages: [{ role: "user", content: formattedPrompt }],
             temperature: 0.7,
         });
 
@@ -56,14 +52,14 @@ const grokApiResponse = async (message) => {
         const text = typeof generatedText === "string" ? generatedText.trim() : "";
 
         if (!text) {
-            return `No response from ${config.label}. Try again.`;
+            return "No response from Groq. Try again.";
         }
 
         return text;
     } catch (error) {
-        console.error("===== AI ERROR =====");
+        console.error("===== GROQ ERROR =====");
         console.error(error?.response?.data || error.message || error);
-        return `Error with ${process.env.GROK_API_KEY?.startsWith("gsk_") ? "Groq" : "Grok"} AI service.`;
+        return "Error with Groq AI service.";
     }
 };
 
